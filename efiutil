@@ -1,0 +1,283 @@
+#!/usr/bin/env ruby
+
+### EFIUtil / A simple tool to find and mount EFI partitions
+### Copyright (C) 2020 Fewtarius
+
+### This program is free software; you can redistribute it and/or modify
+### it under the terms of the GNU General Public License as published by
+### the Free Software Foundation; either version 2 of the License, or
+### (at your option) any later version.
+
+### This program is distributed in the hope that it will be useful,
+### but WITHOUT ANY WARRANTY; without even the implied warranty of
+### MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+### GNU General Public License for more details.
+
+### You should have received a copy of the GNU General Public License
+### along with this program; if not, write to the Free Software
+### Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+require 'rubygems'
+require 'optparse'
+
+###
+### Make sure the script is only run as root.
+###
+
+if Process.uid > 1
+    puts "This utility must be run as the root user or with sudo."
+    exit 1
+end
+
+external_dependencies = [ 'plist' ]
+
+external_dependencies.each do |dependency|
+    begin
+    gem dependency
+    rescue Gem::LoadError
+    Gem.install(dependency)
+    gem "#{dependency}"
+    end
+    require dependency
+end
+
+$options={}
+
+OptionParser.new do |opts|
+    opts.banner=<<EOF
+
+EFI Utility
+-----------
+Performs simple operations on one or many EFI partitions.
+
+Warning: This utility must be run as root or via sudo.
+
+EOF
+
+    opts.on("-bBOOTLOADER", "--bootloader=BOOTLOADER", "Search devices for a specific bootloader or \"all\", CASE SENSITIVE.") do |b|
+        $options['bootloader'] = b
+    end
+    opts.on("-dDEVICE", "--device=DEVICE", "Specify the device for operations.") do |d|
+        $options['device'] = d.gsub(/^\/.*\//,"")
+    end
+    opts.on("-e", "--external", "Perform operations on external disks.") do |e|
+        $options['external'] = true
+    end
+    opts.on("-i", "--internal", "Perform operations on internal disks.") do |i|
+        $options['internal'] = true
+    end
+    opts.on("-m", "--mount", "Mount all matching EFI partitions.") do |m|
+        $options['mount'] = true
+    end
+    opts.on("-n", "--info", "Show information for found devices") do |n|
+        $options['info'] = true
+    end
+    opts.on("-u", "--umount", "Unmount all matching EFI partitions.") do |u|
+        $options['umount'] = true
+    end
+    opts.on("-v", "--verbose", "Verbose.") do |v|
+        $options['verbose'] = true
+    end
+  end.parse!
+
+def getDiskData()
+    ###
+    ### Export disk information into a plist using Disk Utility
+    ###
+
+    diskutilplist = `diskutil list -plist`
+    diskdetail = Plist.parse_xml(diskutilplist)
+    return diskdetail
+end
+
+def inspectDisks(disksinfo)
+    ###
+    ### Inspect each partition looking for EFI partitions.
+    ###
+    devices = Hash.new
+    disksinfo['AllDisks'].each do |disk|
+        puts "Inspecting #{disk} to see if it is an EFI partition" if $options['verbose'] == true
+        diskplist = `diskutil info -plist /dev/#{disk}`
+        diskinfo = Plist.parse_xml(diskplist)
+        devices[disk] = Hash.new
+        if diskinfo['Content'] == 'EFI' || diskinfo['Content'] == 'DOS_FAT_32'
+            puts "Found an EFI partition at #{disk}" if $options['verbose'] == true
+            devices[disk]['Type'] = diskinfo['Content']
+            devices[disk]['MountPoint'] = diskinfo['MountPoint']
+            rootdevice = disk.gsub(/s[0-9+]/,"")
+            rootdeviceplist = `diskutil info -plist /dev/#{rootdevice}`
+            rootdeviceinfo = Plist.parse_xml(rootdeviceplist)
+            devices[disk]['Manufacturer'] = rootdeviceinfo['IORegistryEntryName']
+            devices[disk]['Ejectable'] = rootdeviceinfo['Ejectable']
+            devices[disk]['Internal'] = rootdeviceinfo['Internal']
+            devices[disk]['RootDevice'] = rootdevice
+        else
+            ###
+            ### If it isn't an EFI partition, discard it.
+            ###
+            devices.delete(disk)
+            next
+        end
+        if $options['external'] == true
+            ###
+            ### Discard internal partitions because we only want external.
+            ###
+            if devices[disk]['Internal'] == true
+                devices.delete(disk)
+            end
+        end
+        if $options['internal'] == true
+            ###
+            ### Discard external partitions because we only want internal.
+            ###
+            if devices[disk]['Internal'] == false
+                devices.delete(disk)
+            end
+        end 
+    end
+    return devices
+end
+
+def mountDevice(device,mountpoint)
+    ###
+    ### Rather than figure out a friendly name, just mount on /Volumes/device..
+    ###
+    unless Dir.exist?(mountpoint)
+        Dir.mkdir mountpoint
+    end
+    puts "Mounting partition on #{mountpoint}" if $options['verbose'] == true
+    mountdisk = `diskutil mount -mountpoint #{mountpoint} /dev/#{device}`
+end
+
+def umountDevice(mountpoint)
+    ###
+    ### If you try and unmount too soon, mdworker-scan will cause it to fail.
+    ###
+    begin
+        retries ||= 0
+        sleep 1.2
+        puts "Attempting to unmount #{mountpoint}" if $options['verbose'] == true
+        unmountdisk = `diskutil unmount #{mountpoint}`
+    rescue
+        retry if (retries += 1) < 3
+    end
+end
+
+def efiSearch(devices)
+    devicelist = devices.keys
+    devicelist.each do |device|
+        ###
+        ### Test each EFI partition.
+        ###
+
+        if devices[device]['MountPoint'].nil? == true || devices[device]['MountPoint'].empty? == true
+            mountpoint = "/Volumes/#{device}"
+            mountDevice(device,mountpoint)
+            unmount = true
+        else
+            puts "The device is already mounted on #{devices[device]['MountPoint']}" if $options['verbose'] == true
+            mountpoint = devices[device]['MountPoint']
+            unmount = false
+        end
+
+        devices[device]['BootLoaders'] = Array.new
+        if Dir.exists?("#{mountpoint}/EFI")
+            Dir.foreach("#{mountpoint}/EFI") do |directory|
+                if directory =~ /^[A-z0-9]/
+                    puts "Found bootloader: #{directory}" if $options['verbose'] == true
+                    devices[device]['BootLoaders'].push(directory)
+                end
+            end
+        else
+            puts "No bootloaders were found on #{device}"  if $options['verbose'] == true
+            devices.delete(device)
+            next
+        end
+
+        if devices[device]['BootLoaders'].include?($options['bootloader']) == true
+            puts "Found #{$options['bootloader']} @ #{devices[device]['Manufacturer']} : #{device}"
+        elsif $options['bootloader'] !~ /[AaLlLl]/
+            print "No match for #{$options['bootloader']} @ #{devices[device]['Manufacturer']} : #{device}\nAvailable Bootloaders:\n"
+            devices[device]['BootLoaders'].each do |bootloader|
+                print "   #{bootloader}\n"
+            end
+            unless $options['info'] == true
+                devices.delete(device)
+            end
+        end
+
+        if $options['bootloader'] =~ /[AaLlLl]/
+            print "Available bootloaders @ #{devices[device]['Manufacturer']} : #{device}:\n"
+            devices[device]['BootLoaders'].each do |bootloader|
+                print "   #{bootloader}\n"
+            end
+        end
+
+        if unmount == true
+            if devices[device]['MountPoint'].empty? == true
+                if Dir.exists?("#{mountpoint}")
+                    umountDevice(mountpoint)
+                else
+                    puts "#{devices[device]['Manufacturer']} : #{device} is not mounted."
+                end
+                else
+                if Dir.exists?(devices[device]['MountPoint'])
+                    umountDevice(devices[device]['MountPoint'])
+                else
+                    puts "#{devices[device]['Manufacturer']} : #{device} is not mounted."
+                end
+            end
+        end
+    end
+    return devices
+end
+
+if $options['device'].nil? == true
+    disks = getDiskData
+else
+    disks = Hash.new
+    disks['AllDisks'] = Array.new
+    disks['AllDisks'].push($options['device'])
+end
+
+devices = inspectDisks(disks)
+
+if $options['bootloader'].nil? == false || $options['bootloader'] =~ /[AaLlLl]/
+    devices = efiSearch(devices)
+end
+
+devicelist = devices.keys
+devicelist.each do |device|
+    if $options['info'] == true || $options['verbose'] == true
+    print "#{device}:\n"
+        devices[device].each do |key, value|
+            puts "    #{key}: #{value}"
+        end
+        print "\n"
+    end
+    if $options['mount'] == true
+        if devices[device]['MountPoint'].empty? == true
+            mountDevice(device,"/Volumes/#{device}")
+            puts "Mounted #{devices[device]['Manufacturer']} : #{device} on /Volumes/#{device}"
+        else
+            puts "#{device} is already mounted at #{devices[device]['MountPoint']}"
+        end
+    end
+    if $options['umount'] == true
+        if devices[device]['MountPoint'].empty? == true
+            if Dir.exists?("/Volumes/#{device}")
+                umountDevice("/Volumes/#{device}")
+                puts "Unmounted #{devices[device]['Manufacturer']} : #{device} from /Volumes/#{device}"
+            else
+                puts "#{devices[device]['Manufacturer']} : #{device} is not mounted."
+            end   
+          else
+                if Dir.exists?(devices[device]['MountPoint'])
+                    umountDevice(devices[device]['MountPoint'])
+                    puts "Unmounted #{devices[device]['Manufacturer']} : #{device} from #{devices[device]['MountPoint']}"
+                else
+                    puts "#{devices[device]['Manufacturer']} : #{device} is not mounted."
+                end
+          end
+    end
+end
