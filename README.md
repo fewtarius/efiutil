@@ -6,6 +6,15 @@ A very simple utility to find and mount EFI partitions.
 
 Clone the archive and copy efiutil to /usr/local/bin.  Dependencies will install on first run.
 
+```
+$ git clone git@github.com:fewtarius/efiutil.git
+$ test -d /usr/local/bin || sudo mkdir /usr/local/bin
+$ sudo cp efiutil/efiutil /usr/local/bin
+$ sudo chmod 755 /usr/local/bin/efiutil
+```
+
+
+
 ### Usage
 
 ```bash
@@ -17,16 +26,17 @@ Performs simple operations on one or many EFI partitions.
 
 Warning: This utility must be run as root or via sudo.
 
-    -b, --bootloader=BOOTLOADER      Search devices for a specific bootloader or "all", CASE SENSITIVE.
-    -d, --device=DEVICE              Specify the device for operations.
-    -e, --external                   Perform operations on external disks.
-    -i, --internal                   Perform operations on internal disks.
-    -m, --mount                      Mount all matching EFI partitions.
+    -b, --backup                     Backup EFI(s) to /Users/fewtarius/EFIBackup
+    -d, --device=DEVICE              Specify the device for operations
+    -e, --external                   Perform operations on external disks
+    -i, --internal                   Perform operations on internal disks
+    -m, --mount                      Mount all matching EFI partitions
     -n, --info                       Show information for found devices
-    -u, --umount                     Unmount all matching EFI partitions.
+    -o, --bootloader=BOOTLOADER      Search for a specific bootloader or "all"
+    -p, --path=PATH                  Specify the path for EFI backups
+    -u, --umount                     Unmount all matching EFI partitions
+    -v, --verbose                    Verbose
 ```
-
-
 
 ### Examples
 
@@ -71,7 +81,26 @@ disk0s1:
     Ejectable: false
     Internal: true
     RootDevice: disk0
-
-#
+# efiutil --backup --internal
+Mounted SPCC M.2 PCIe SSD Media : disk0s1 on /Volumes/disk0s1
+Backing up SPCC M.2 PCIe SSD Media : disk0s1 to EFI-SPCC_M.2_PCIe_SSD_Media-disk0s1-06162020-182849.zip
+Unmounted SPCC M.2 PCIe SSD Media : disk0s1 from /Volumes/disk0s1
+# ./efiutil --backup --bootloader OC
+Found OC @ SPCC M.2 PCIe SSD Media : disk0s1
+Found OC @ SanDisk Cruzer Glide 3.0 Media : disk2s1
+No match for OC @ Flash Drive SM_USB20 Media : disk3s1
+Available Bootloaders:
+   BOOT
+Mounted SPCC M.2 PCIe SSD Media : disk0s1 on /Volumes/disk0s1
+Backing up SPCC M.2 PCIe SSD Media : disk0s1 to EFI-SPCC_M.2_PCIe_SSD_Media-disk0s1-06162020-182949.zip
+Unmounted SPCC M.2 PCIe SSD Media : disk0s1 from /Volumes/disk0s1
+Mounted SanDisk Cruzer Glide 3.0 Media : disk2s1 on /Volumes/disk2s1
+Backing up SanDisk Cruzer Glide 3.0 Media : disk2s1 to EFI-SanDisk_Cruzer_Glide_3.0_Media-disk2s1-06162020-182956.zip
+Unmounted SanDisk Cruzer Glide 3.0 Media : disk2s1 from /Volumes/disk2s1
+# ./efiutil --backup --bootloader OC --internal
+Found OC @ SPCC M.2 PCIe SSD Media : disk0s1
+Mounted SPCC M.2 PCIe SSD Media : disk0s1 on /Volumes/disk0s1
+Backing up SPCC M.2 PCIe SSD Media : disk0s1 to EFI-SPCC_M.2_PCIe_SSD_Media-disk0s1-06162020-183009.zip
+Unmounted SPCC M.2 PCIe SSD Media : disk0s1 from /Volumes/disk0s1
 ```
 

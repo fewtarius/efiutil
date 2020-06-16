@@ -42,6 +42,7 @@ external_dependencies.each do |dependency|
 end
 
 $options={}
+backuppath = "#{ENV['HOME']}/EFIBackup"
 
 ARGV << '-h' if ARGV.empty?
 
@@ -56,28 +57,34 @@ Warning: This utility must be run as root or via sudo.
 
 EOF
 
-    opts.on("-bBOOTLOADER", "--bootloader=BOOTLOADER", "Search devices for a specific bootloader or \"all\", CASE SENSITIVE.") do |b|
-        $options['bootloader'] = b
+    opts.on("-b", "--backup", "Backup EFI(s) to #{backuppath}") do |b|
+        $options['backup'] = b
     end
-    opts.on("-dDEVICE", "--device=DEVICE", "Specify the device for operations.") do |d|
+    opts.on("-dDEVICE", "--device=DEVICE", "Specify the device for operations") do |d|
         $options['device'] = d.gsub(/^\/.*\//,"")
     end
-    opts.on("-e", "--external", "Perform operations on external disks.") do |e|
+    opts.on("-e", "--external", "Perform operations on external disks") do |e|
         $options['external'] = true
     end
-    opts.on("-i", "--internal", "Perform operations on internal disks.") do |i|
+    opts.on("-i", "--internal", "Perform operations on internal disks") do |i|
         $options['internal'] = true
     end
-    opts.on("-m", "--mount", "Mount all matching EFI partitions.") do |m|
+    opts.on("-m", "--mount", "Mount all matching EFI partitions") do |m|
         $options['mount'] = true
     end
     opts.on("-n", "--info", "Show information for found devices") do |n|
         $options['info'] = true
     end
-    opts.on("-u", "--umount", "Unmount all matching EFI partitions.") do |u|
+    opts.on("-oBOOTLOADER", "--bootloader=BOOTLOADER", "Search for a specific bootloader or \"all\"") do |o|
+        $options['bootloader'] = o
+    end
+    opts.on("-pPATH", "--path=PATH", "Specify the path for EFI backups") do |p|
+        $options['backuppath'] = p
+    end
+    opts.on("-u", "--umount", "Unmount all matching EFI partitions") do |u|
         $options['umount'] = true
     end
-    opts.on("-v", "--verbose", "Verbose.") do |v|
+    opts.on("-v", "--verbose", "Verbose") do |v|
         $options['verbose'] = true
     end
   end.parse!
@@ -217,7 +224,7 @@ def efiSearch(devices)
 
         if unmount == true
             if devices[device]['MountPoint'].empty? == true
-                if Dir.exists?("#{mountpoint}")
+                if Dir.exists?(mountpoint)
                     umountDevice(mountpoint)
                 else
                     puts "#{devices[device]['Manufacturer']} : #{device} is not mounted."
@@ -251,21 +258,31 @@ end
 devicelist = devices.keys
 devicelist.each do |device|
     if $options['info'] == true || $options['verbose'] == true
-    print "#{device}:\n"
+        print "#{device}:\n"
         devices[device].each do |key, value|
             puts "    #{key}: #{value}"
         end
         print "\n"
     end
-    if $options['mount'] == true
+    if $options['mount'] == true || $options['backup'] == true
         if devices[device]['MountPoint'].empty? == true
             mountDevice(device,"/Volumes/#{device}")
+            devices[device]['MountPoint']="/Volumes/#{device}"
             puts "Mounted #{devices[device]['Manufacturer']} : #{device} on /Volumes/#{device}"
         else
             puts "#{device} is already mounted at #{devices[device]['MountPoint']}"
         end
     end
-    if $options['umount'] == true
+    if $options['backup'] == true
+        unless Dir.exists?(backuppath)
+            Dir.mkdir backuppath
+        end
+        time = Time.new
+        backupfilename="EFI-#{devices[device]['Manufacturer'].gsub(/ /,"_")}-#{device}-#{time.strftime("%m%d%Y-%H%M%S")}.zip"
+        puts "Backing up #{devices[device]['Manufacturer']} : #{device} to #{backupfilename}"
+        backupout=`zip -r #{backuppath}/#{backupfilename} /Volumes/#{device}/EFI`
+    end
+    if $options['umount'] == true  || $options['backup'] == true
         if devices[device]['MountPoint'].empty? == true
             if Dir.exists?("/Volumes/#{device}")
                 umountDevice("/Volumes/#{device}")
