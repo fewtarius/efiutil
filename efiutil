@@ -79,13 +79,13 @@ EOF
         $options['bootloader'] = o
     end
     opts.on("-pPATH", "--path=PATH", "Specify the path for EFI backups") do |p|
-        $options['backuppath'] = p
+        backuppath = p
+    end
+    opts.on("-s", "--silent", "Perform operations quietly.") do |s|
+        $options['silent'] = s
     end
     opts.on("-u", "--umount", "Unmount all matching EFI partitions") do |u|
         $options['umount'] = true
-    end
-    opts.on("-v", "--verbose", "Verbose") do |v|
-        $options['verbose'] = true
     end
   end.parse!
 
@@ -105,12 +105,10 @@ def inspectDisks(disksinfo)
     ###
     devices = Hash.new
     disksinfo['AllDisks'].each do |disk|
-        puts "Inspecting #{disk} to see if it is an EFI partition" if $options['verbose'] == true
         diskplist = `diskutil info -plist /dev/#{disk}`
         diskinfo = Plist.parse_xml(diskplist)
         devices[disk] = Hash.new
         if diskinfo['Content'] == 'EFI' || diskinfo['Content'] == 'DOS_FAT_32'
-            puts "Found an EFI partition at #{disk}" if $options['verbose'] == true
             devices[disk]['Type'] = diskinfo['Content']
             devices[disk]['MountPoint'] = diskinfo['MountPoint']
             rootdevice = disk.gsub(/s[0-9+]/,"")
@@ -154,7 +152,6 @@ def mountDevice(device,mountpoint)
     unless Dir.exist?(mountpoint)
         Dir.mkdir mountpoint
     end
-    puts "Mounting partition on #{mountpoint}" if $options['verbose'] == true
     mountdisk = `diskutil mount -mountpoint #{mountpoint} /dev/#{device}`
 end
 
@@ -165,7 +162,6 @@ def umountDevice(mountpoint)
     begin
         retries ||= 0
         sleep 1.2
-        puts "Attempting to unmount #{mountpoint}" if $options['verbose'] == true
         unmountdisk = `diskutil unmount #{mountpoint}`
     rescue
         retry if (retries += 1) < 3
@@ -184,7 +180,6 @@ def efiSearch(devices)
             mountDevice(device,mountpoint)
             unmount = true
         else
-            puts "The device is already mounted on #{devices[device]['MountPoint']}" if $options['verbose'] == true
             mountpoint = devices[device]['MountPoint']
             unmount = false
         end
@@ -193,12 +188,10 @@ def efiSearch(devices)
         if Dir.exists?("#{mountpoint}/EFI")
             Dir.foreach("#{mountpoint}/EFI") do |directory|
                 if directory =~ /^[A-z0-9]/
-                    puts "Found bootloader: #{directory}" if $options['verbose'] == true
                     devices[device]['BootLoaders'].push(directory)
                 end
             end
         else
-            puts "No bootloaders were found on #{device}"  if $options['verbose'] == true
             devices.delete(device)
             next
         end
@@ -227,13 +220,13 @@ def efiSearch(devices)
                 if Dir.exists?(mountpoint)
                     umountDevice(mountpoint)
                 else
-                    puts "#{devices[device]['Manufacturer']} : #{device} is not mounted."
+                    puts "#{devices[device]['Manufacturer']} : #{device} is not mounted." unless $options['silent'] == true
                 end
                 else
                 if Dir.exists?(devices[device]['MountPoint'])
                     umountDevice(devices[device]['MountPoint'])
                 else
-                    puts "#{devices[device]['Manufacturer']} : #{device} is not mounted."
+                    puts "#{devices[device]['Manufacturer']} : #{device} is not mounted." unless $options['silent'] == true
                 end
             end
         end
@@ -257,7 +250,7 @@ end
 
 devicelist = devices.keys
 devicelist.each do |device|
-    if $options['info'] == true || $options['verbose'] == true
+    if $options['info'] == true
         print "#{device}:\n"
         devices[device].each do |key, value|
             puts "    #{key}: #{value}"
@@ -268,9 +261,9 @@ devicelist.each do |device|
         if devices[device]['MountPoint'].empty? == true
             mountDevice(device,"/Volumes/#{device}")
             devices[device]['MountPoint']="/Volumes/#{device}"
-            puts "Mounted #{devices[device]['Manufacturer']} : #{device} on /Volumes/#{device}"
+            puts "Mounted #{devices[device]['Manufacturer']} : #{device} on /Volumes/#{device}" unless $options['silent'] == true
         else
-            puts "#{device} is already mounted at #{devices[device]['MountPoint']}"
+            puts "#{device} is already mounted at #{devices[device]['MountPoint']}" unless $options['silent'] == true
         end
     end
     if $options['backup'] == true
@@ -279,23 +272,23 @@ devicelist.each do |device|
         end
         time = Time.new
         backupfilename="EFI-#{devices[device]['Manufacturer'].gsub(/ /,"_")}-#{time.strftime("%m%d%Y-%H%M%S")}.zip"
-        puts "Backing up EFI to #{backupfilename}"
+        puts "Backing up EFI to #{backupfilename}" unless $options['silent'] == true
         backupout=`zip -r #{backuppath}/#{backupfilename} /Volumes/#{device}/EFI`
     end
     if $options['umount'] == true  || $options['backup'] == true
         if devices[device]['MountPoint'].empty? == true
             if Dir.exists?("/Volumes/#{device}")
                 umountDevice("/Volumes/#{device}")
-                puts "Unmounted #{devices[device]['Manufacturer']} : #{device} from /Volumes/#{device}"
+                puts "Unmounted #{devices[device]['Manufacturer']} : #{device} from /Volumes/#{device}" unless $options['silent'] == true
             else
-                puts "#{devices[device]['Manufacturer']} : #{device} is not mounted."
+                puts "#{devices[device]['Manufacturer']} : #{device} is not mounted." unless $options['silent'] == true
             end   
           else
                 if Dir.exists?(devices[device]['MountPoint'])
                     umountDevice(devices[device]['MountPoint'])
-                    puts "Unmounted #{devices[device]['Manufacturer']} : #{device} from #{devices[device]['MountPoint']}"
+                    puts "Unmounted #{devices[device]['Manufacturer']} : #{device} from #{devices[device]['MountPoint']}" unless $options['silent'] == true
                 else
-                    puts "#{devices[device]['Manufacturer']} : #{device} is not mounted."
+                    puts "#{devices[device]['Manufacturer']} : #{device} is not mounted." unless $options['silent'] == true
                 end
           end
     end

@@ -34,8 +34,8 @@ Warning: This utility must be run as root or via sudo.
     -n, --info                       Show information for found devices
     -o, --bootloader=BOOTLOADER      Search for a specific bootloader or "all"
     -p, --path=PATH                  Specify the path for EFI backups
+    -s, --silent                     Perform operations quietly.
     -u, --umount                     Unmount all matching EFI partitions
-    -v, --verbose                    Verbose
 ```
 
 ### Examples
