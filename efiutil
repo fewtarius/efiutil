@@ -278,8 +278,8 @@ devicelist.each do |device|
             Dir.mkdir backuppath
         end
         time = Time.new
-        backupfilename="EFI-#{devices[device]['Manufacturer'].gsub(/ /,"_")}-#{device}-#{time.strftime("%m%d%Y-%H%M%S")}.zip"
-        puts "Backing up #{devices[device]['Manufacturer']} : #{device} to #{backupfilename}"
+        backupfilename="EFI-#{devices[device]['Manufacturer'].gsub(/ /,"_")}-#{time.strftime("%m%d%Y-%H%M%S")}.zip"
+        puts "Backing up EFI to #{backupfilename}"
         backupout=`zip -r #{backuppath}/#{backupfilename} /Volumes/#{device}/EFI`
     end
     if $options['umount'] == true  || $options['backup'] == true

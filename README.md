@@ -92,15 +92,15 @@ No match for OC @ Flash Drive SM_USB20 Media : disk3s1
 Available Bootloaders:
    BOOT
 Mounted SPCC M.2 PCIe SSD Media : disk0s1 on /Volumes/disk0s1
-Backing up SPCC M.2 PCIe SSD Media : disk0s1 to EFI-SPCC_M.2_PCIe_SSD_Media-disk0s1-06162020-182949.zip
+Backing up EFI  EFI-SPCC_M.2_PCIe_SSD_Media-disk0s1-06162020-182949.zip
 Unmounted SPCC M.2 PCIe SSD Media : disk0s1 from /Volumes/disk0s1
 Mounted SanDisk Cruzer Glide 3.0 Media : disk2s1 on /Volumes/disk2s1
-Backing up SanDisk Cruzer Glide 3.0 Media : disk2s1 to EFI-SanDisk_Cruzer_Glide_3.0_Media-disk2s1-06162020-182956.zip
+Backing up EFI to EFI-SanDisk_Cruzer_Glide_3.0_Media-disk2s1-06162020-182956.zip
 Unmounted SanDisk Cruzer Glide 3.0 Media : disk2s1 from /Volumes/disk2s1
 # ./efiutil --backup --bootloader OC --internal
 Found OC @ SPCC M.2 PCIe SSD Media : disk0s1
 Mounted SPCC M.2 PCIe SSD Media : disk0s1 on /Volumes/disk0s1
-Backing up SPCC M.2 PCIe SSD Media : disk0s1 to EFI-SPCC_M.2_PCIe_SSD_Media-disk0s1-06162020-183009.zip
+Backing up EFI to EFI-SPCC_M.2_PCIe_SSD_Media-disk0s1-06162020-183009.zip
 Unmounted SPCC M.2 PCIe SSD Media : disk0s1 from /Volumes/disk0s1
 ```
 
