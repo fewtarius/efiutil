@@ -26,7 +26,7 @@ Performs simple operations on one or many EFI partitions.
 
 Warning: This utility must be run as root or via sudo.
 
-    -b, --backup                     Backup EFI(s) to /Users/fewtarius/EFIBackup
+    -b, --backup                     Backup EFI(s) to ~/EFIBackup
     -d, --device=DEVICE              Specify the device for operations
     -e, --external                   Perform operations on external disks
     -i, --internal                   Perform operations on internal disks
