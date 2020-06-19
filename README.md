@@ -1,6 +1,6 @@
 ## EFIUTIL
 
-A very simple utility to find and mount EFI partitions.
+A very simple utility to find, mount, and backup EFI partitions for macOS.
 
 ### Installation
 
